@@ -1,0 +1,98 @@
+# Update Repository Source List
+sudo apt-get update
+sudo nano /etc/apt/sources.list
+
+# Run Update Command
+sudo apt-get update
+
+# Install Required Packages
+sudo apt-get install build-essential
+sudo apt-get install dwarfdump
+sudo apt-get install linux-headers-$(uname -r)
+gcc --version
+sudo apt-get install git
+
+# Install LiME and Create Memory Dump
+sudo git clone https://github.com/504ensicsLabs/LiME.git
+cd LiME/src
+sudo make
+sudo insmod ./lime-4.9.0-13-amd64.ko "path=/home/cst3510/week2dump.lime format=lime"
+cd /home/cst3510
+ls -al
+
+# Create a Volatility Profile
+strings week2dump.lime | grep BOOT_IMAGE
+sudo git clone https://github.com/volatilityfoundation/volatility.git
+cd volatility/tools/linux
+sudo chown -R cst3510: /home/cst3510/volatility
+make
+zip $(lsb_release -i -s)_$(uname -r)_profile.zip ./module.dwarf /boot/System.map-$(uname -r)
+sudo apt-get install zip
+cp Debian_4.9.0-13-amd64_profile.zip /home/cst3510
+ls /home/cst3510
+
+# Transfer Files to Shared Folder
+sudo shutdown -h now
+
+# Access Shared Folder
+sudo mount -t iso9660 /dev/sr0 /media/cdrom
+cd /media/cdrom
+sudo sh ./VBoxLinuxAdditions.run
+cd /media/testShare
+sudo nano /etc/group
+exit
+
+# Copy Files for Analysis on Kali
+cp Debian_4.9.0-13-amd64_profile.zip /media/testShare
+cp week2dump.lime /media/testShare
+
+# Setup for Volatility Analysis on Kali
+volatility --info | grep Linux
+cp Debian_4.9.0-13-amd64_profile.zip /home/kali/volatility/volatility/plugins/overlays/linux
+cd /home/kali/volatility/volatility/plugins/overlays/linux
+ls
+chmod 777 Debian_4.9.0-13-amd64_profile.zip
+volatility --info | grep Linux
+volatility –f week2dump.lime --profile=LinuxDebian_4_9_0-13-amd64_profilex64 linux_pslist
+
+# Create VirtualBox Dump
+VBoxManage debugvm "MemoryAnalysis" dumpvmcore --filename="kali.elf"
+
+---------------------------------------------------------------------------------------------------
+
+
+# Process Listing
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_pslist
+
+# Process Tree
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_pstree
+
+# Systemd Process Maps
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_proc_maps -p 1
+
+# Systemd File Handlers
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_lsof -p 1
+
+# Sleep Process Maps (Exercise 1)
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_proc_maps -p <sleep_process_pid>
+
+# Sleep Process File Handlers (Exercise 1)
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_lsof -p <sleep_process_pid>
+
+# Create Output Directory
+mkdir maps
+
+# Recover Executable Section of Systemd
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_dump_map -p 1 -s 0x0000560f8f4e3000 -D maps/
+
+# Recover Executable of Sleep Process (Exercise 2)
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_dump_map -p <sleep_process_pid> -s <start_address> -D maps/
+
+# Check Command Line Arguments
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_psaux
+
+# Identify Environmental Variables of Processes
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-amd64_profilex64 linux_psenv
+
+# Recover Bash History for Specific Process
+volatility -f debian.dump --profile=LinuxDebian_4_9_0-12-
